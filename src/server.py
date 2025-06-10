@@ -1,97 +1,71 @@
 import socket
-import threading
-import tkinter as tk
-from tkinter import simpledialog, messagebox
 
-# Criação da janela principal
-app = tk.Tk()
-app.title("Servidor TCP com Tkinter")
-app.geometry("400x300")
+# Menu host
+print('\033[1;32;40mServidor em execução...\033[m')
+print('\033[1;32;40m1 - Local Host\033[m')
+print('\033[1;32;40m2 - Remote Host\033[m')
+opcaoHost = input('\033[1;32;40mOpção: \033[m')
 
-# Variáveis globais
-server_socket = None
-client_socket = None
+if opcaoHost == '1':
+    host = "localhost"  # 127.0.0.1
+elif opcaoHost == '2':
+    host = input('\033[1;32;40mInsira o endereço IP para o servidor escutar: \033[m')
+else:
+    print('\033[1;32;40m"Comando Inválido\033[m')
+    exit()
 
-def iniciar_servidor():
-    global server_socket, client_socket
+# Configuração da porta
+print('\033[1;32;40m1 - Porta Padrão (49152)\033[m')
+print('\033[1;32;40m2 - Porta Específica\033[m')
+opcaoPorta = input('\033[1;32;40mOpção: \033[m')
 
-    host = host_var.get()
-    if host == "localhost":
-        host = "127.0.0.1"
-    else:
-        host = simpledialog.askstring("Host Remoto", "Insira o IP do host:")
-
-    if porta_var.get() == "padrão":
-        port = 49152
-    else:
-        port = simpledialog.askinteger("Porta", "Insira o número da porta:")
-
-    # Verifica se porta está em uso
+if opcaoPorta == '1':
+    port = 49152 
+elif opcaoPorta == '2':
     try:
-        # Criar socket TCP/IP
-        server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        server_socket.bind((host, port))
-        server_socket.listen(1)
-        log(f"Servidor ouvindo em {host}:{port}...")
-    except OSError:
-        messagebox.showerror("Erro", "Porta já está em uso.")
-        return
+        port = int(input('\033[1;32;40mInsira a porta: \033[m'))
+    except ValueError:
+        print('\033[1;32;40mPorta inválida.\033[m')
+        exit()
+else:
+    print('\033[1;32;40mComando Inválido\033[m')
+    exit()
 
-    def aceitar_conexao():
-        global client_socket
-        client_socket, client_address = server_socket.accept()
-        log(f"Conexão com {client_address}")
-        receber_mensagens()
+# Criação do socket TCP
+server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-    threading.Thread(target=aceitar_conexao, daemon=True).start()
+# Faz o bind do servidor ao host e porta
+try:
+    server_socket.bind((host, port))
+except socket.error as e:
+    print(f'\033[1;32;40mErro ao vincular o socket: {e}\033[m')
+    exit()
 
-def receber_mensagens():
-    def thread_receber():
-        while True:
-            try:
-                data = client_socket.recv(1024)
-                if not data:
-                    break
-                log(f"Cliente: {data.decode()}")
-            except:
-                break
-    threading.Thread(target=thread_receber, daemon=True).start()
+# Escutando por conexões
+server_socket.listen(1)
+print(f'\033[1;32;40mServidor escutando em {host}:{port}...\033[m')
 
-def enviar_mensagem():
-    msg = msg_entry.get()
-    if client_socket and msg:
-        client_socket.sendall(msg.encode())
-        log(f"Você: {msg}")
-        msg_entry.delete(0, tk.END)
+# Aceita a conexão do cliente
+conn, addr = server_socket.accept()
+print(f'\033[1;32;40mConexão estabelecida com {addr}\033[m')
 
-def log(msg):
-    log_text.config(state=tk.NORMAL)
-    log_text.insert(tk.END, msg + "\n")
-    log_text.config(state=tk.DISABLED)
-    log_text.see(tk.END)
+# Comunicação
+while True:
+    data = conn.recv(1024)
+    if not data:
+        break
 
-# Interface gráfica
-tk.Label(app, text="Escolha o host:").pack()
+    mensagem = data.decode()
+    print(f'\033[1;32;40m<>>: {mensagem}\033[m')
 
-host_var = tk.StringVar(value="localhost")
-tk.Radiobutton(app, text="Localhost", variable=host_var, value="localhost").pack()
-tk.Radiobutton(app, text="Host Remoto", variable=host_var, value="remoto").pack()
+    if mensagem.lower() == 'sair':
+        conn.sendall("Conexão encerrada.".encode())
+        break
 
-tk.Label(app, text="Escolha a porta:").pack()
+    resposta = input("<?>: ")
+    conn.sendall(resposta.encode())
 
-porta_var = tk.StringVar(value="padrão")
-tk.Radiobutton(app, text="Padrão (49152)", variable=porta_var, value="padrão").pack()
-tk.Radiobutton(app, text="Personalizada", variable=porta_var, value="personalizada").pack()
-
-tk.Button(app, text="Iniciar Servidor", command=iniciar_servidor).pack(pady=10)
-
-log_text = tk.Text(app, height=10, state=tk.DISABLED)
-log_text.pack()
-
-msg_entry = tk.Entry(app)
-msg_entry.pack(fill=tk.X, padx=10)
-
-tk.Button(app, text="Enviar", command=enviar_mensagem).pack(pady=5)
-
-# Rodar a interface
-app.mainloop()
+# Fecha a conexão
+conn.close()
+server_socket.close()
+print('\033[1;32;40mServidor finalizado\033[m')
